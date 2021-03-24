@@ -19,7 +19,7 @@ void setup()
   u8g2.begin();
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_logisoso28_tr);
-  u8g2.drawStr(8, 29, "MYBOTIC");
+  u8g2.drawStr(8, 29, "WET-NET");
   u8g2.sendBuffer();
 
   dht.begin();
@@ -31,8 +31,8 @@ void loop()
 {
   delay(2000);
 
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
+  int h = int(dht.readHumidity());
+  int t = int(dht.readTemperature());
 
   if (isnan(h) || isnan(t))
   {
@@ -45,4 +45,9 @@ void loop()
   Serial.print(F("%  Temperature: "));
   Serial.print(t);
   Serial.println(F("°C "));
+
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_8x13_tr);
+  u8g2.drawStr(0, 32, ("H " + String(h) + "% T " + String(t) + "C").c_str());
+  u8g2.sendBuffer();
 }
