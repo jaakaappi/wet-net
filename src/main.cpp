@@ -1,10 +1,12 @@
 #include <Arduino.h>
-#include <U8g2lib.h>
-#include <Wire.h>
 #include "DHT.h"
 #include "SPIFFS.h"
+#include <U8g2lib.h>
 #include "Update.h"
 #include "WiFi.h"
+#include <Wire.h>
+
+#include "../lib/config.h"
 
 #define DHTPIN 23
 #define DHTTYPE DHT11
@@ -50,4 +52,17 @@ void loop()
   u8g2.setFont(u8g2_font_8x13_tr);
   u8g2.drawStr(0, 32, ("H " + String(h) + "% T " + String(t) + "C").c_str());
   u8g2.sendBuffer();
+}
+
+void initWiFi()
+{
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi ..");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.print('.');
+    delay(1000);
+  }
+  Serial.println(WiFi.localIP());
 }
