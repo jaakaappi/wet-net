@@ -30,7 +30,6 @@ int nodes = 0;
 painlessMesh mesh;
 WiFiClient wifiClient;
 IPAddress myIP(0, 0, 0, 0);
-IPAddress mqttBroker = IPAddress().fromString(mqttbrokerip);
 PubSubClient mqttClient(mqttBroker, 1883, mqttCallback, wifiClient);
 
 int temperature = 0;
@@ -83,6 +82,11 @@ void droppedNodeCallback(uint32_t nodeId)
 {
   Serial.printf("Dropped connection %u\n", nodeId);
   nodes--;
+}
+
+void sendMQTTTElemetry()
+{
+  mqttClient.publish("v1/devices/me/telemetry", ("{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}").c_str());
 }
 
 void setup()
@@ -145,6 +149,7 @@ void loop()
     Serial.print(t);
     Serial.println(F("°C "));
     updateDisplay();
+    sendMQTTTElemetry();
   }
 
   mesh.update();
@@ -157,13 +162,8 @@ void loop()
 
     if (mqttClient.connect("painlessMeshClient", authtoken, nullptr))
     {
-      mqttClient.publish("painlessMesh/from/gateway", "Ready!");
-      mqttClient.subscribe("painlessMesh/to/#");
       Serial.println("MQTT ready");
     }
-  }
-  else
-  {
   }
 }
 
