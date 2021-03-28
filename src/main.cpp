@@ -1,31 +1,42 @@
 #include <Arduino.h>
 #include "DHT.h"
 #include "painlessMesh.h"
+#include <PubSubClient.h>
 #include "SPIFFS.h"
 #include <U8g2lib.h>
 #include "Update.h"
+#include <WiFiClient.h>
 #include "WiFi.h"
 #include <Wire.h>
 
 #include "../lib/config.h"
 
-#define MESH_PREFIX "wetnet"
-#define MESH_PORT 5555
-
 #define DHTPIN 23
 #define DHTTYPE DHT11
 
+#define MESH_PREFIX "wetnet"
+#define MESH_PORT 5555
 #define IS_BRIDGE true
+#define HOSTNAME "MQTT_Bridge"
+
+void mqttCallback(char *topic, byte *payload, unsigned int length);
+IPAddress getlocalIP();
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
 
 DHT dht(DHTPIN, DHTTYPE);
 
 int nodes = 0;
-Scheduler userScheduler; // to control your personal task
 painlessMesh mesh;
+WiFiClient wifiClient;
+IPAddress myIP(0, 0, 0, 0);
+IPAddress mqttBroker = IPAddress().fromString(mqttbrokerip);
+PubSubClient mqttClient(mqttBroker, 1883, mqttCallback, wifiClient);
 
-void updateDisplay(int temperature, int humidity)
+int temperature = 0;
+int humidity = 0;
+
+void updateDisplay()
 {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_8x13_tr);
@@ -45,32 +56,6 @@ void updateDisplay(int temperature, int humidity)
   u8g2.drawStr(40, 16, (String(nodes) + " nodes").c_str());
   u8g2.drawStr(0, 32, ("H " + String(humidity) + "% T " + String(temperature) + "C").c_str());
   u8g2.sendBuffer();
-}
-
-void initWiFi()
-{
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi ..");
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print('.');
-    delay(1000);
-  }
-  Serial.println(WiFi.localIP());
-}
-
-// User stub
-void sendMessage(); // Prototype so PlatformIO doesn't complain
-
-Task taskSendMessage(TASK_SECOND * 1, TASK_FOREVER, &sendMessage);
-
-void sendMessage()
-{
-  String msg = "Hello from node ";
-  msg += mesh.getNodeId();
-  mesh.sendBroadcast(msg);
-  taskSendMessage.setInterval(random(TASK_SECOND * 1, TASK_SECOND * 5));
 }
 
 void receivedCallback(uint32_t from, String &msg)
@@ -120,15 +105,18 @@ void setup()
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
   mesh.setDebugMsgTypes(ERROR | MESH_STATUS | CONNECTION); // set before init() so that you can see startup messages
 
-  mesh.init(MESH_PREFIX, meshpassword, &userScheduler, MESH_PORT);
+  mesh.init(MESH_PREFIX, meshpassword, MESH_PORT, WIFI_AP_STA);
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
   mesh.onDroppedConnection(&droppedNodeCallback);
 
-  userScheduler.addTask(taskSendMessage);
-  taskSendMessage.enable();
+  mesh.stationManual(ssid, password);
+  mesh.setHostname(HOSTNAME);
+
+  mesh.setRoot(true);
+  mesh.setContainsRoot(true);
 }
 
 int dht_flag = 0;
@@ -137,7 +125,7 @@ void loop()
 {
   if (dht_flag <= millis())
   {
-    dht_flag = millis() + 2000;
+    dht_flag = millis() + 5000;
 
     int h = int(dht.readHumidity());
     int t = int(dht.readTemperature());
@@ -148,13 +136,42 @@ void loop()
       return;
     }
 
+    temperature = t;
+    humidity = h;
+
     Serial.print(F("Humidity: "));
     Serial.print(h);
     Serial.print(F("%  Temperature: "));
     Serial.print(t);
     Serial.println(F("°C "));
-    updateDisplay(t, h);
+    updateDisplay();
   }
 
   mesh.update();
+  mqttClient.loop();
+
+  if (myIP != getlocalIP())
+  {
+    myIP = getlocalIP();
+    Serial.println("My IP is " + myIP.toString());
+
+    if (mqttClient.connect("painlessMeshClient", authtoken, nullptr))
+    {
+      mqttClient.publish("painlessMesh/from/gateway", "Ready!");
+      mqttClient.subscribe("painlessMesh/to/#");
+      Serial.println("MQTT ready");
+    }
+  }
+  else
+  {
+  }
+}
+
+void mqttCallback(char *topic, uint8_t *payload, unsigned int length)
+{
+}
+
+IPAddress getlocalIP()
+{
+  return IPAddress(mesh.getStationIP());
 }

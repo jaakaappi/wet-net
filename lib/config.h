@@ -1,3 +1,5 @@
-const char *ssid = "asd";
-const char *password = "asd";
-const char *meshpassword = "asd";
+const char *ssid = "";
+const char *password = "";
+const char *meshpassword = "";
+const char *mqttbrokerip = "";
+const char *authtoken = "";
