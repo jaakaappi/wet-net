@@ -1,0 +1,14 @@
+#container {
+  padding: 5px;
+}
+
+.chartContainer {
+  display: flex;
+}
+
+.ct-series-a .ct-line .ct-point {
+  stroke: red;
+}
+.ct-series-b .ct-line .ct-point {
+  stroke: blue;
+}
