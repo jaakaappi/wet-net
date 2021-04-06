@@ -43,12 +43,10 @@ void updateDisplay()
   {
     if (WiFi.status() == WL_CONNECTED)
     {
-
       u8g2.drawStr(0, 16, "wifi");
     }
     else
     {
-
       u8g2.drawStr(0, 16, "wait");
     }
   }
@@ -57,9 +55,35 @@ void updateDisplay()
   u8g2.sendBuffer();
 }
 
+void sendMQTTTElemetry(String device, String message)
+{
+  if (mqttClient.publish("v1/gateway/telemetry", message.c_str()))
+  {
+    Serial.println("Sent");
+  }
+  else
+  {
+    Serial.println("Failed");
+  }
+}
+
+const char *createMessage()
+{
+  // return ("{\"" + String(thingsboardDeviceName) + "\":{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}}").c_str();
+  return ("{\"" + String(thingsboardDeviceName) + "\":[{\"values\":{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}}]}").c_str();
+  // return ("{\"" + String(thingsboardDeviceName) + "\":[{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}]}").c_str();
+}
+
 void receivedCallback(uint32_t from, String &msg)
 {
-  Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
+  if (IS_BRIDGE)
+  {
+    int split = String(msg).indexOf(':');
+    String device = msg.substring(0, split);
+    String new_msg = msg.substring(split);
+    Serial.println("Forwarding " + device + " " + new_msg);
+    sendMQTTTElemetry(device, new_msg);
+  }
 }
 
 void newConnectionCallback(uint32_t nodeId)
@@ -84,11 +108,6 @@ void droppedNodeCallback(uint32_t nodeId)
   nodes--;
 }
 
-void sendMQTTTElemetry()
-{
-  mqttClient.publish("v1/devices/me/telemetry", ("{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}").c_str());
-}
-
 void setup()
 {
   Serial.begin(115200);
@@ -101,32 +120,39 @@ void setup()
 
   dht.begin();
 
-  // if (IS_BRIDGE)
-  // {
-  //   mesh.setRoot(true);
-  // }
-
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes(ERROR | MESH_STATUS | CONNECTION); // set before init() so that you can see startup messages
+  mesh.setDebugMsgTypes(ERROR | MESH_STATUS | CONNECTION);
 
-  mesh.init(MESH_PREFIX, meshpassword, MESH_PORT, WIFI_AP_STA);
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
   mesh.onDroppedConnection(&droppedNodeCallback);
 
-  mesh.stationManual(ssid, password);
-  mesh.setHostname(HOSTNAME);
-
-  mesh.setRoot(true);
-  mesh.setContainsRoot(true);
+  if (IS_BRIDGE)
+  {
+    mesh.init(MESH_PREFIX, meshpassword, MESH_PORT, WIFI_AP_STA);
+    mesh.stationManual(ssid, password);
+    mesh.setHostname(HOSTNAME);
+    mesh.setRoot(true);
+    mesh.setContainsRoot(true);
+    mqttClient.setBufferSize(512);
+    mqttClient.setKeepAlive(60);
+  }
+  else
+  {
+    mesh.init(MESH_PREFIX, meshpassword, MESH_PORT);
+  }
 }
 
 int dht_flag = 0;
 
 void loop()
 {
+  mesh.update();
+  mqttClient.loop();
+  delay(100);
+
   if (dht_flag <= millis())
   {
     dht_flag = millis() + 5000;
@@ -149,26 +175,44 @@ void loop()
     Serial.print(t);
     Serial.println(F("°C "));
     updateDisplay();
-    sendMQTTTElemetry();
-  }
 
-  mesh.update();
-  mqttClient.loop();
-
-  if (myIP != getlocalIP())
-  {
-    myIP = getlocalIP();
-    Serial.println("My IP is " + myIP.toString());
-
-    if (mqttClient.connect("painlessMeshClient", authtoken, nullptr))
+    if (IS_BRIDGE && mqttClient.connected())
     {
-      Serial.println("MQTT ready");
+      // const char *message = createMessage();
+      // Serial.println(message);
+      // sendMQTTTElemetry(authtoken, message);
+      // mqttClient.publish("v1/gateway/telemetry", ("{\"" + String(thingsboardDeviceName) + "\":[{\"values\":{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}}]}").c_str());
+      // mqttClient.publish("v1/gateway/telemetry", ("{\"" + String(thingsboardDeviceName) + "\":{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}}").c_str());
+      // Serial.println(mqttClient.publish("v1/gateway/telemetry", ("{\"" + String(thingsboardDeviceName) + "\":[{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}]}").c_str()));
+
+      Serial.println(mqttClient.publish("v1/devices/me/telemetry", "{\"humidity\":1}"));
+      mqttClient.loop();
     }
+    Serial.println(mqttClient.state());
+  }
+  if (IS_BRIDGE)
+  {
+    if (myIP != getlocalIP())
+    {
+      myIP = getlocalIP();
+      Serial.println("My IP is " + myIP.toString());
+
+      if (mqttClient.connect("painlessMeshClient", authtoken, nullptr))
+      {
+        Serial.println("MQTT ready");
+      }
+    }
+  }
+  else
+  {
+    mesh.sendBroadcast((thingsboardDeviceName + String(":") + String(createMessage())).c_str());
   }
 }
 
 void mqttCallback(char *topic, uint8_t *payload, unsigned int length)
 {
+  Serial.println("message");
+  Serial.println(topic);
 }
 
 IPAddress getlocalIP()
