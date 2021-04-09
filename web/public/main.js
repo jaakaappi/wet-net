@@ -1,5 +1,4 @@
 const generatePage = (devices) => {
-  console.log(devices);
   const container = document.getElementById("container");
 
   devices.forEach((device, i) => {
@@ -36,6 +35,10 @@ const generatePage = (devices) => {
       axis: {
         x: {
           type: "timeseries",
+          label: {
+            text: "time of day",
+            position: "outer-center",
+          },
           tick: {
             count: 12,
             format: "%H:%m",
@@ -43,7 +46,7 @@ const generatePage = (devices) => {
         },
         y: {
           label: {
-            text: "temperature",
+            text: "temperature °C",
             position: "outer-middle",
           },
           position: "outer-middle",
@@ -51,7 +54,7 @@ const generatePage = (devices) => {
         y2: {
           show: true,
           label: {
-            text: "humidity",
+            text: "humidity rel-%",
             position: "outer-middle",
           },
         },
