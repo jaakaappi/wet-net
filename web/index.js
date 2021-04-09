@@ -17,7 +17,7 @@ const generateAxiosRequest = (device_id, token) => {
     url: `http://${
       process.env.THINGSBOARD_URL
     }/api/plugins/telemetry/DEVICE/${device_id}/values/timeseries?useStrictDataTypes=false&keys=temperature,humidity&startTs=${
-      Date.now() - 3 * 60 * 60 * 1000
+      Date.now() - 48 * 60 * 60 * 1000
     }&endTs=${Date.now()}&limit=1000000`,
     headers: {
       "content-type": "application/json",
@@ -46,7 +46,6 @@ app.get("/api", async (req, res) => {
         const deviceResponseData = (
           await axios(generateAxiosRequest(value.id, token))
         ).data;
-        console.log(deviceResponseData);
         const sortedData = deviceResponseData.humidity.map((value, index) => {
           return [
             value.ts,
@@ -58,9 +57,7 @@ app.get("/api", async (req, res) => {
           (data) =>
             data[1] <= 100 && data[1] >= 0 && data[2] <= 100 && data[2] >= -100
         );
-        console.log(filteredData);
         const unzippedData = _.unzip(filteredData);
-        // console.log(unzippedData);
         return {
           name: value.label,
           timestamps: unzippedData[0],
@@ -70,7 +67,6 @@ app.get("/api", async (req, res) => {
       })
     );
 
-    // console.log(responseData);
     res.send(responseData);
   } catch (error) {
     console.error(error);

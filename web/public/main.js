@@ -30,9 +30,30 @@ const generatePage = (devices) => {
           humidity: "y2",
         },
       },
+      point: {
+        show: false,
+      },
       axis: {
+        x: {
+          type: "timeseries",
+          tick: {
+            count: 12,
+            format: "%H:%m",
+          },
+        },
+        y: {
+          label: {
+            text: "temperature",
+            position: "outer-middle",
+          },
+          position: "outer-middle",
+        },
         y2: {
           show: true,
+          label: {
+            text: "humidity",
+            position: "outer-middle",
+          },
         },
       },
     });
