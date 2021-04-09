@@ -1,5 +1,7 @@
 const generatePage = (devices) => {
+  console.log(new Date().toLocaleString());
   const container = document.getElementById("container");
+  container.innerHTML = "";
 
   devices.forEach((device, i) => {
     const chartContainer = document.createElement("div");
@@ -68,9 +70,17 @@ const showError = (err) => {
   const container = document.getElementById("container");
   const errorText = document.createElement("p");
   errorText.innerHTML = `There was an error fetching data from the API: ${err.message}`;
+  container.appendChild(errorText);
 };
 
 fetch("http://localhost:8081/api")
   .then((response) => response.json())
   .then((json) => generatePage(json))
   .catch((err) => showError(err));
+
+setInterval(() => {
+  fetch("http://localhost:8081/api")
+    .then((response) => response.json())
+    .then((json) => generatePage(json))
+    .catch((err) => showError(err));
+}, 60 * 1000);
