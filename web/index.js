@@ -11,14 +11,12 @@ const deviceIdPairs = [
   { label: "bathroom", id: process.env.BATHROOM_ID },
 ];
 
-const generateAxiosRequest = (device_id, token) => {
+const generateAxiosRequest = (device_id, token, from) => {
   return {
     method: "get",
     url: `http://${
       process.env.THINGSBOARD_URL
-    }/api/plugins/telemetry/DEVICE/${device_id}/values/timeseries?useStrictDataTypes=false&keys=temperature,humidity&startTs=${
-      Date.now() - 48 * 60 * 60 * 1000
-    }&endTs=${Date.now()}&limit=1000000`,
+    }/api/plugins/telemetry/DEVICE/${device_id}/values/timeseries?useStrictDataTypes=false&keys=temperature,humidity&startTs=${from}&endTs=${Date.now()}&limit=1000000`,
     headers: {
       "content-type": "application/json",
       "X-Authorization": `Bearer ${token}`,
@@ -44,7 +42,7 @@ app.get("/api", async (req, res) => {
     const responseData = await Promise.all(
       deviceIdPairs.map(async (value) => {
         const deviceResponseData = (
-          await axios(generateAxiosRequest(value.id, token))
+          await axios(generateAxiosRequest(value.id, token, req.query.from))
         ).data;
         const sortedData = deviceResponseData.humidity.map((value, index) => {
           return [

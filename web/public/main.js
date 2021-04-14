@@ -1,3 +1,6 @@
+let charts = {};
+let updateTimestamp = 0;
+
 const generatePage = (devices) => {
   console.log(new Date().toLocaleString());
   const container = document.getElementById("container");
@@ -62,6 +65,21 @@ const generatePage = (devices) => {
         },
       },
     });
+    charts[device.name] = chart;
+  });
+};
+
+const updatePage = (devices) => {
+  devices.forEach((device) => {
+    const chart = charts[device.name];
+
+    chart.load({
+      columns: [
+        ["x", ...device.timestamps],
+        ["temperature", ...device.temperature],
+        ["humidity", ...device.humidity],
+      ],
+    });
   });
 };
 
@@ -73,14 +91,14 @@ const showError = (err) => {
   container.appendChild(errorText);
 };
 
-fetch("http://localhost:8081/api")
+fetch(`http://localhost:8081/api?from=${Date.now() - 48 * 60 * 60 * 1000}`)
   .then((response) => response.json())
   .then((json) => generatePage(json))
   .catch((err) => showError(err));
 
 setInterval(() => {
-  fetch("http://localhost:8081/api")
+  fetch(`http://localhost:8081/api?from=${Date.now() - 48 * 60 * 60 * 1000}`)
     .then((response) => response.json())
-    .then((json) => generatePage(json))
+    .then((json) => updatePage(json))
     .catch((err) => showError(err));
-}, 60 * 1000);
+}, 10 * 60 * 1000);
